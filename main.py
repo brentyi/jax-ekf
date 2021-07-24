@@ -42,7 +42,7 @@ def linear_system_example():
         )
         belief = ekf.correct(
             belief=belief,
-            obs=MultivariateGaussian(
+            observation=MultivariateGaussian(
                 mean=onp.random.randn(5),
                 cov=onp.random.randn(observation_dim, observation_dim),
             ),
@@ -84,7 +84,7 @@ def SE3_system_example():
         )
         belief = ekf.correct(
             belief=belief,
-            obs=MultivariateGaussian(jaxlie.SE3.identity(), cov=jnp.eye(6)),
+            observation=MultivariateGaussian(jaxlie.SE3.identity(), cov=jnp.eye(6)),
         )
     print(belief)
 

@@ -97,7 +97,7 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
         assert belief.cov.shape == dynamics_cov.shape == (local_dim, local_dim)
 
         A: jnp.ndarray = jax.jacfwd(
-            # Computing jacobian of $f(x \oplus delta) \ominus x$
+            # Computing jacobian of $f(x \boxplus delta) \boxminus x$
             lambda tangent: self.state_manifold.boxminus(
                 self.dynamics_model(
                     self.state_manifold.boxplus(belief.mean, tangent), control_input
@@ -114,15 +114,15 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
     def correct(
         self,
         belief: MultivariateGaussian[StateType],
-        obs: MultivariateGaussian[ObservationType],
+        observation: MultivariateGaussian[ObservationType],
     ) -> MultivariateGaussian[StateType]:
         """EKF correction step."""
 
         # Quick shape checks
         local_dim = self.state_manifold.local_dim_from_point(belief.mean)
         assert belief.cov.shape == (local_dim, local_dim)
-        local_dim = self.observation_manifold.local_dim_from_point(obs.mean)
-        assert obs.cov.shape == (local_dim, local_dim)
+        local_dim = self.observation_manifold.local_dim_from_point(observation.mean)
+        assert observation.cov.shape == (local_dim, local_dim)
 
         C: jnp.ndarray = jax.jacfwd(
             lambda tangent: self.observation_manifold.boxminus(
@@ -134,8 +134,8 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
         )(jnp.zeros(self.state_manifold.local_dim_from_point(belief.mean)))
 
         pred_obs_mean = self.observation_model(belief.mean)
-        innovation = self.observation_manifold.boxminus(obs.mean, pred_obs_mean)
-        innovation_cov = C @ belief.cov @ C.T + obs.cov
+        innovation = self.observation_manifold.boxminus(observation.mean, pred_obs_mean)
+        innovation_cov = C @ belief.cov @ C.T + observation.cov
 
         K = belief.cov @ C.T @ jnp.linalg.inv(innovation_cov)
 
