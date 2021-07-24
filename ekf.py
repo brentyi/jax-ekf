@@ -11,6 +11,7 @@ from jax import numpy as jnp
 
 # Manifold definition API
 
+Array = Union[onp.ndarray, jnp.ndarray]
 ManifoldPoint = TypeVar("ManifoldPoint")
 
 
@@ -19,23 +20,18 @@ ManifoldPoint = TypeVar("ManifoldPoint")
 class ManifoldDefinition(Generic[ManifoldPoint]):
     """Manifold definition."""
 
-    boxplus: Callable[[ManifoldPoint, jnp.ndarray], ManifoldPoint]
-    boxminus: Callable[[ManifoldPoint, ManifoldPoint], jnp.ndarray]
+    boxplus: Callable[[ManifoldPoint, Array], ManifoldPoint]
+    boxminus: Callable[[ManifoldPoint, ManifoldPoint], Array]
     local_dim_from_point: Callable[[ManifoldPoint], int]
 
     def assert_validity(self, example: ManifoldPoint) -> None:
-        def _assert_allclose(x: Any, y: Any, **kwargs):
-            """"""
+        def _assert_allclose(x: Any, y: Any):
             for a, b in zip(jax.tree_leaves(x), jax.tree_leaves(y)):
-                onp.testing.assert_allclose(a, b, **kwargs)
+                onp.testing.assert_allclose(a, b, atol=1e-5, rtol=1e-5)
 
         _assert_allclose(
             self.boxplus(example, jnp.zeros(self.local_dim_from_point(example))),
             example,
-        )
-        _assert_allclose(
-            self.boxminus(example, example),
-            onp.zeros(self.local_dim_from_point(example)),
         )
         _assert_allclose(
             self.boxminus(example, example),
@@ -47,7 +43,7 @@ class ManifoldDefinition(Generic[ManifoldPoint]):
 # Should support arbitrary Pytrees
 
 
-def _linear_boxplus(x: ManifoldPoint, tangent: jnp.ndarray) -> ManifoldPoint:
+def _linear_boxplus(x: ManifoldPoint, tangent: Array) -> ManifoldPoint:
     flat, unflatten = flatten_util.ravel_pytree(x)
     return unflatten(x + tangent)
 
@@ -65,7 +61,6 @@ euclidean_manifold = ManifoldDefinition[Any](
 StateType = TypeVar("StateType")
 ObservationType = TypeVar("ObservationType")
 ControlInputType = TypeVar("ControlInputType")
-Array = Union[onp.ndarray, jnp.ndarray]
 
 
 @jax_dataclasses.pytree_dataclass
@@ -139,7 +134,7 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
 
         K = belief.cov @ C.T @ jnp.linalg.inv(innovation_cov)
 
-        with jax_dataclasses.copy_and_mutate(belief) as out:
+        with jax_dataclasses.copy_and_mutate(belief, validate=True) as out:
             out.mean = self.state_manifold.boxplus(belief.mean, K @ innovation)
             out.cov = (jnp.eye(belief.cov.shape[0]) - K @ C) @ belief.cov
         return out
