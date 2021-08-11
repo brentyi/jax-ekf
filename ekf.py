@@ -45,7 +45,7 @@ class ManifoldDefinition(Generic[ManifoldPoint]):
 
 def _linear_boxplus(x: ManifoldPoint, tangent: Array) -> ManifoldPoint:
     flat, unflatten = flatten_util.ravel_pytree(x)
-    return unflatten(x + tangent)
+    return unflatten(flat + tangent)
 
 
 euclidean_manifold = ManifoldDefinition[Any](
