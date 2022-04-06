@@ -1,3 +1,8 @@
+"""For usage: `python main.py --help`"""
+
+import dataclasses
+
+import dcargs
 import jaxlie
 import numpy as onp
 from jax import numpy as jnp
@@ -9,6 +14,15 @@ from ekf import (
     MultivariateGaussian,
     euclidean_manifold,
 )
+
+
+@dataclasses.dataclass
+class CliArgs:
+    # Set flag to run EKF on a linear system.
+    run_linear_system: bool = False
+
+    # Set flag to run EKF on an SE(3) system.
+    run_SE3_system: bool = False
 
 
 def linear_system_example():
@@ -32,7 +46,8 @@ def linear_system_example():
         observation_model=lambda x: C @ x,
     )
 
-    # In practice, we probably want to use an XLA loop primitive
+    # In practice, we probably want to use an XLA loop primitive; this is
+    # straightforward with the belief as the carried state.
     belief = MultivariateGaussian(mean=onp.ones(5), cov=onp.eye(5))
     for i in range(5):
         belief = ekf.predict(
@@ -76,7 +91,8 @@ def SE3_system_example():
         observation_manifold=lie_group_manifold,
     )
 
-    # In practice, we probably want to use an XLA loop primitive
+    # In practice, we probably want to use an XLA loop primitive; this is
+    # straightforward with the belief as the carried state.
     belief = MultivariateGaussian(jaxlie.SE3.identity(), cov=jnp.eye(6))
     for i in range(5):
         belief = ekf.predict(
@@ -90,5 +106,11 @@ def SE3_system_example():
 
 
 if __name__ == "__main__":
-    linear_system_example()
-    SE3_system_example()
+    args = dcargs.parse(CliArgs)
+    if args.run_linear_system:
+        linear_system_example()
+    if args.run_SE3_system:
+        SE3_system_example()
+
+    if not args.run_linear_system and not args.run_SE3_system:
+        print("For usage: `python main.py --help`")

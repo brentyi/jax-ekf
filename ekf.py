@@ -4,7 +4,7 @@ import dataclasses
 from typing import Any, Callable, Generic, TypeVar, Union
 
 import jax
-import jax_dataclasses
+import jax_dataclasses as jdc
 import numpy as onp
 from jax import flatten_util
 from jax import numpy as jnp
@@ -15,7 +15,7 @@ Array = Union[onp.ndarray, jnp.ndarray]
 ManifoldPoint = TypeVar("ManifoldPoint")
 
 
-# @dataclasses.dataclass(frozen=True) # <== TODO: when mypy v0.920 is released
+# Should be frozen, if not for: https://github.com/python/mypy/issues/5485
 @dataclasses.dataclass
 class ManifoldDefinition(Generic[ManifoldPoint]):
     """Manifold definition."""
@@ -63,13 +63,13 @@ ObservationType = TypeVar("ObservationType")
 ControlInputType = TypeVar("ControlInputType")
 
 
-@jax_dataclasses.pytree_dataclass
+@jdc.pytree_dataclass
 class MultivariateGaussian(Generic[ManifoldPoint]):
     mean: ManifoldPoint
     cov: Array
 
 
-# @dataclasses.dataclass(frozen=True) # <== TODO: when mypy v0.920 is released
+# Should be frozen, if not for: https://github.com/python/mypy/issues/5485
 @dataclasses.dataclass
 class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
     """Extended Kalman filter definition."""
@@ -101,7 +101,7 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
             )
         )(jnp.zeros(self.state_manifold.local_dim_from_point(belief.mean)))
 
-        with jax_dataclasses.copy_and_mutate(belief, validate=True) as out:
+        with jdc.copy_and_mutate(belief, validate=True) as out:
             out.mean = self.dynamics_model(belief.mean, control_input)
             out.cov = A @ belief.cov @ A.T + dynamics_cov  # type: ignore
         return out
@@ -113,7 +113,7 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
     ) -> MultivariateGaussian[StateType]:
         """EKF correction step."""
 
-        # Quick shape checks
+        # Quick shape checks.
         local_dim = self.state_manifold.local_dim_from_point(belief.mean)
         assert belief.cov.shape == (local_dim, local_dim)
         local_dim = self.observation_manifold.local_dim_from_point(observation.mean)
@@ -130,11 +130,11 @@ class EkfDefinition(Generic[StateType, ObservationType, ControlInputType]):
 
         pred_obs_mean = self.observation_model(belief.mean)
         innovation = self.observation_manifold.boxminus(observation.mean, pred_obs_mean)
-        innovation_cov = C @ belief.cov @ C.T + observation.cov
+        innovation_cov = C @ belief.cov @ C.T + observation.cov  # type: ignore
 
-        K = belief.cov @ C.T @ jnp.linalg.inv(innovation_cov)
+        K = belief.cov @ C.T @ jnp.linalg.inv(innovation_cov)  # type: ignore
 
-        with jax_dataclasses.copy_and_mutate(belief, validate=True) as out:
+        with jdc.copy_and_mutate(belief, validate=True) as out:
             out.mean = self.state_manifold.boxplus(belief.mean, K @ innovation)
             out.cov = (jnp.eye(belief.cov.shape[0]) - K @ C) @ belief.cov
         return out
